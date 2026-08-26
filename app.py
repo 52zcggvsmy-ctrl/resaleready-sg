@@ -3,7 +3,7 @@
 import streamlit as st
 
 from src.auth import init_auth_state, login_form, logout
-from src.pages import about, home, market_explorer, methodology, resale_qa
+from src.pages import about, home, knowledge_base, market_explorer, methodology, resale_qa
 
 
 st.set_page_config(
@@ -24,7 +24,14 @@ with st.sidebar:
     st.caption("Buyer-side HDB resale navigator")
     page_name = st.radio(
         "Navigate",
-        ["Home", "Market Explorer", "Ask ResaleReady", "About Us", "Methodology"],
+        [
+            "Home",
+            "Market Explorer",
+            "Ask ResaleReady",
+            "Knowledge Base",
+            "About Us",
+            "Methodology",
+        ],
         label_visibility="collapsed",
     )
     st.divider()
@@ -36,6 +43,7 @@ PAGES = {
     "Home": home.render,
     "Market Explorer": market_explorer.render,
     "Ask ResaleReady": resale_qa.render,
+    "Knowledge Base": knowledge_base.render,
     "About Us": about.render,
     "Methodology": methodology.render,
 }

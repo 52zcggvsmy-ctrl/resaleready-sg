@@ -4,6 +4,8 @@ import os
 
 import streamlit as st
 
+from src.rag.uploads import SESSION_UPLOAD_RESULTS_KEY, SESSION_UPLOAD_STORE_KEY
+
 
 DEMO_USERNAME = os.getenv("RESALEREADY_USERNAME", "admin")
 DEMO_PASSWORD = os.getenv("RESALEREADY_PASSWORD", "r3ady4r3sale=")
@@ -40,4 +42,6 @@ def logout() -> None:
     st.session_state.authenticated = False
     st.session_state.username = ""
     st.session_state.pop("resaleready_chat_history", None)
+    st.session_state.pop(SESSION_UPLOAD_STORE_KEY, None)
+    st.session_state.pop(SESSION_UPLOAD_RESULTS_KEY, None)
     st.rerun()

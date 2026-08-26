@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import asdict
 from typing import Any
 
 import streamlit as st
 
+from src.app_config import secret_or_environment
 from src.rag.qa import validate_question
-from src.rag.runtime import create_qa_service
+from src.rag.runtime import attach_uploaded_store, create_qa_service
+from src.rag.uploads import SESSION_UPLOAD_STORE_KEY, UploadedVectorStore
 
 CHAT_HISTORY_KEY = "resaleready_chat_history"
 DEFAULT_CHAT_MODEL = "gpt-5.6-luna"
@@ -22,25 +23,23 @@ def _load_qa_service(chat_model: str, _api_key: str):
     return create_qa_service(api_key=_api_key, chat_model=chat_model)
 
 
-def _secret_or_environment(name: str, default: str = "") -> str:
-    try:
-        secret = st.secrets.get(name)
-    except (FileNotFoundError, KeyError):
-        secret = None
-    return str(secret or os.getenv(name, default)).strip()
-
-
 def _render_sources(sources: list[dict[str, Any]]) -> None:
     if not sources:
         return
-    st.caption("Supporting official HDB sources")
+    st.caption("Supporting sources")
     for source in sources:
         location = ""
         if source.get("section"):
             location = f" — {source['section']}"
         elif source.get("page"):
             location = f" — page {source['page']}"
-        title = source.get("title", "Official HDB source")
+        title = source.get("title", "Reference source")
+        if source.get("source_kind") == "uploaded_demo":
+            filename = source.get("local_filename", "uploaded file")
+            st.markdown(
+                f"- **{title}** — uploaded demo document, unverified ({filename}){location}"
+            )
+            continue
         url = source.get("url", "")
         if url:
             st.markdown(f"- [{title}]({url}){location}")
@@ -78,14 +77,21 @@ def _append_assistant_message(
 def render() -> None:
     st.title("💬 Ask ResaleReady")
     st.write(
-        "Ask about the buyer-side HDB resale process. Answers are generated from "
-        "the curated official HDB documents in the ResaleReady knowledge base."
+        "Ask about the buyer-side HDB resale process. Answers prioritise the curated "
+        "official HDB documents in the ResaleReady knowledge base."
     )
     st.warning(
         "ResaleReady provides general information, not eligibility decisions, property "
         "valuations, predictions, or financial or legal advice. Verify important matters "
         "through the linked official HDB sources or HDB directly."
     )
+
+    uploaded_store = st.session_state.get(SESSION_UPLOAD_STORE_KEY)
+    if isinstance(uploaded_store, UploadedVectorStore) and uploaded_store.document_count:
+        st.caption(
+            f"This session also contains {uploaded_store.document_count} unverified "
+            "uploaded demo document(s). Official HDB sources remain primary."
+        )
 
     st.session_state.setdefault(CHAT_HISTORY_KEY, [])
     history: list[dict[str, Any]] = st.session_state[CHAT_HISTORY_KEY]
@@ -104,8 +110,8 @@ def render() -> None:
     for message in history:
         _render_message(message)
 
-    api_key = _secret_or_environment("OPENAI_API_KEY")
-    chat_model = _secret_or_environment("RESALEREADY_CHAT_MODEL", DEFAULT_CHAT_MODEL)
+    api_key = secret_or_environment("OPENAI_API_KEY")
+    chat_model = secret_or_environment("RESALEREADY_CHAT_MODEL", DEFAULT_CHAT_MODEL)
     if not api_key:
         st.info(
             "Ask ResaleReady is not configured yet. Add `OPENAI_API_KEY` to Streamlit "
@@ -127,21 +133,22 @@ def render() -> None:
     _render_message(user_message)
 
     with st.chat_message("assistant"):
-        # This check must run before service creation, which can build/embed the index.
         safeguard = validate_question(question)
         if not safeguard.allowed:
             blocked_answer = safeguard.message or "I cannot help with that request."
             st.markdown(blocked_answer)
-            _append_assistant_message(
-                history,
-                blocked_answer,
-                blocked=True,
-            )
+            _append_assistant_message(history, blocked_answer, blocked=True)
             st.rerun()
 
         try:
             with st.spinner("Checking official HDB sources..."):
                 service = _load_qa_service(chat_model, api_key)
+                if isinstance(uploaded_store, UploadedVectorStore):
+                    service = attach_uploaded_store(
+                        service,
+                        uploaded_store,
+                        api_key=api_key,
+                    )
                 result = service.answer(question, history=prior_history)
         except Exception:
             LOGGER.exception("Ask ResaleReady failed to answer a question.")

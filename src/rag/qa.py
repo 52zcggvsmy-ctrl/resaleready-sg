@@ -54,6 +54,8 @@ class AnswerSource:
     url: str
     page: int | None = None
     section: str | None = None
+    source_kind: str = "curated_hdb"
+    local_filename: str = ""
 
 
 @dataclass(frozen=True)
@@ -112,14 +114,16 @@ def validate_question(question: str) -> SafeguardResult:
 
 def _deduplicate_sources(chunks: Sequence[RetrievedChunk]) -> tuple[AnswerSource, ...]:
     sources: list[AnswerSource] = []
-    seen: set[tuple[str, str, int | None, str | None]] = set()
+    seen: set[tuple[str, str, int | None, str | None, str]] = set()
     for chunk in chunks:
         metadata = chunk.metadata
+        source_kind = str(metadata.get("source_kind", "curated_hdb"))
         key = (
             str(metadata.get("document_title", "Untitled source")),
             str(metadata.get("source_url", "")),
             metadata.get("page"),
             metadata.get("section"),
+            source_kind,
         )
         if key in seen:
             continue
@@ -131,6 +135,8 @@ def _deduplicate_sources(chunks: Sequence[RetrievedChunk]) -> tuple[AnswerSource
                 url=key[1],
                 page=key[2],
                 section=key[3],
+                source_kind=source_kind,
+                local_filename=str(metadata.get("local_filename", "")),
             )
         )
     return tuple(sources)
@@ -179,7 +185,6 @@ class ResaleReadyQA:
             input_text=build_rewrite_input(question, history),
             max_output_tokens=160,
         )
-        # Keep an unexpected verbose response from becoming an oversized retrieval query.
         rewritten = " ".join(rewritten.split())[:MAX_QUESTION_CHARACTERS].strip()
         return rewritten or question.strip()
 

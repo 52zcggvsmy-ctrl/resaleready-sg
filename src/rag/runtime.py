@@ -11,6 +11,7 @@ from .embeddings import OpenAIEmbeddingProvider
 from .ingestion import chunk_documents
 from .qa import ResaleReadyQA
 from .retrieval import DEFAULT_VECTOR_STORE_DIR
+from .uploads import UploadedVectorStore
 from .vector_store import (
     CHUNKS_FILE,
     INDEX_FILE,
@@ -67,7 +68,7 @@ def create_qa_service(
     vector_store_dir: Path = DEFAULT_VECTOR_STORE_DIR,
     top_k: int = 4,
 ) -> ResaleReadyQA:
-    """Create a configured production Q&A service, building its store if needed."""
+    """Create a configured Q&A service backed by curated HDB documents."""
 
     ensure_vector_store(api_key=api_key, vector_store_dir=vector_store_dir)
     embedding_provider = OpenAIEmbeddingProvider(api_key=api_key)
@@ -77,4 +78,39 @@ def create_qa_service(
         text_generator=text_generator,
         retrieve_chunks=lambda query, top_k: retriever.retrieve(query, top_k=top_k),
         top_k=top_k,
+    )
+
+
+def attach_uploaded_store(
+    base_service: ResaleReadyQA,
+    uploaded_store: UploadedVectorStore,
+    *,
+    api_key: str,
+) -> ResaleReadyQA:
+    """Add session uploads while reserving most context for curated HDB sources."""
+
+    if uploaded_store.chunk_count == 0:
+        return base_service
+    embedding_provider = OpenAIEmbeddingProvider(
+        api_key=api_key,
+        model_name=uploaded_store.model_name,
+    )
+    static_retrieve = base_service.retrieve_chunks
+
+    def retrieve_combined(query: str, top_k: int):
+        # Curated HDB context keeps the majority quota and appears first in the prompt.
+        upload_quota = min(1, max(0, top_k - 1))
+        static_quota = top_k - upload_quota
+        static_results = static_retrieve(query, static_quota)
+        upload_results = uploaded_store.retrieve(
+            query,
+            top_k=upload_quota,
+            embedding_provider=embedding_provider,
+        )
+        return static_results + upload_results
+
+    return ResaleReadyQA(
+        text_generator=base_service.text_generator,
+        retrieve_chunks=retrieve_combined,
+        top_k=base_service.top_k,
     )

@@ -10,6 +10,7 @@ A Streamlit prototype for prospective HDB resale flat buyers in Singapore.
 - Robust CSV preprocessing with an included demo-data fallback
 - Curated HDB document ingestion, token-aware chunking, and FAISS retrieval foundation
 - Conversation-aware, source-grounded HDB resale Q&A with safeguards
+- Administrative PDF/TXT upload demonstration with a session-only FAISS index
 - About Us and Methodology pages
 
 ## Quick start
@@ -84,26 +85,36 @@ OPENAI_API_KEY = "your-key"
 RESALEREADY_CHAT_MODEL = "gpt-5.6-luna"
 ```
 
-The model setting is optional. If the generated FAISS files are absent, the app builds the small curated knowledge base on the first Q&A request and reuses it for later requests in the same deployment instance.
+The model setting is optional. If the generated FAISS files are absent, the app builds the small curated knowledge base on the first Q&A or upload request and reuses it for later requests in the same deployment instance.
+
+## Knowledge Base upload demo
+
+After signing in, open **Knowledge Base** to upload PDF or UTF-8 TXT files. Each file is limited to 10 MB and passes through validation, text extraction, cleaning, 850-token chunking with 120-token overlap, OpenAI embedding, and addition to an in-memory FAISS index.
+
+Uploaded documents are unverified, session-only reference material. Their original files are not written to the repository, they are removed on logout or when the session/app ends, and they are never treated as executable instructions or official HDB policy. During Q&A, curated official HDB sources keep the majority of retrieval slots and appear before uploaded references.
 
 ## Project structure
 
 ```text
 app.py                                      # Entry point, navigation, authentication gate
+src/app_config.py                           # Streamlit secret/environment configuration
 src/auth.py                                 # Demo login and session state
 src/data.py                                 # Loading, validation, filtering, and aggregation
 src/openai_client.py                        # Reusable OpenAI Responses API boundary
 src/prompts.py                              # Follow-up rewrite and grounded-answer prompts
-src/pages/                                  # Page-level UI modules
+src/pages/knowledge_base.py                 # Administrative upload demonstration
+src/pages/                                  # Other page-level UI modules
+src/rag/uploads.py                          # Upload validation and in-memory FAISS index
 src/rag/                                    # Ingestion, retrieval, safeguards, and Q&A chain
-scripts/build_vector_store.py               # Reproducible vector-store build command
+scripts/build_vector_store.py               # Reproducible curated vector-store build command
 tests/test_data.py                          # Deterministic data-pipeline tests
 tests/test_rag_ingestion.py                 # Offline ingestion and retrieval tests
 tests/test_rag_qa.py                        # Offline safeguard and prompt-chain tests
+tests/test_rag_uploads.py                   # Offline upload validation and retrieval tests
 data/structured/hdb_resale_transactions.csv # Official HDB resale transactions
 data/demo_resale_transactions.csv           # Development/error fallback
 data/rag_sources/                           # Curated official HDB PDF/TXT documents
-data/vector_store/                          # Generated retrieval index and metadata
+data/vector_store/                          # Generated curated retrieval index and metadata
 .streamlit/config.toml
 requirements.txt
 ```
@@ -118,4 +129,4 @@ python -m unittest discover -s tests
 
 ## Scope and limitations
 
-The Market Explorer is based on and only describes historical transactions. It does not predict prices, establish market value, calculate affordability, determine HDB eligibility, or provide financial or legal advice. Ask ResaleReady is limited to general information grounded in its curated HDB knowledge base and does not make eligibility decisions or replace official HDB guidance. If in doubt, please verify any information with official sources.
+The Market Explorer is based on and only describes historical transactions. It does not predict prices, establish market value, calculate affordability, determine HDB eligibility, or provide financial or legal advice. Ask ResaleReady is limited to general information grounded primarily in its curated HDB knowledge base and does not make eligibility decisions or replace official HDB guidance. Uploaded demo documents are unverified references and must be checked against official sources. If in doubt, please verify any information with official sources.
