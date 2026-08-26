@@ -9,6 +9,7 @@ A Streamlit prototype for prospective HDB resale flat buyers in Singapore.
 - Summary metrics, monthly median-price trend, price distribution, transaction table, and CSV export
 - Robust CSV preprocessing with an included demo-data fallback
 - Curated HDB document ingestion, token-aware chunking, and FAISS retrieval foundation
+- Conversation-aware, source-grounded HDB resale Q&A with safeguards
 - About Us and Methodology pages
 
 ## Quick start
@@ -67,17 +68,38 @@ for result in results:
     print(result.score, result.metadata["document_title"])
 ```
 
+## Ask ResaleReady configuration
+
+The Q&A service uses the OpenAI Responses API for follow-up rewriting and grounded answers. Set the API key outside the repository. For local use:
+
+```bash
+export OPENAI_API_KEY="your-key"
+streamlit run app.py
+```
+
+For Streamlit Community Cloud, add the following under the deployed app's **Settings → Secrets**:
+
+```toml
+OPENAI_API_KEY = "your-key"
+RESALEREADY_CHAT_MODEL = "gpt-5.6-luna"
+```
+
+The model setting is optional. If the generated FAISS files are absent, the app builds the small curated knowledge base on the first Q&A request and reuses it for later requests in the same deployment instance.
+
 ## Project structure
 
 ```text
 app.py                                      # Entry point, navigation, authentication gate
 src/auth.py                                 # Demo login and session state
 src/data.py                                 # Loading, validation, filtering, and aggregation
+src/openai_client.py                        # Reusable OpenAI Responses API boundary
+src/prompts.py                              # Follow-up rewrite and grounded-answer prompts
 src/pages/                                  # Page-level UI modules
-src/rag/                                    # Ingestion, embeddings, FAISS store, and retrieval
+src/rag/                                    # Ingestion, retrieval, safeguards, and Q&A chain
 scripts/build_vector_store.py               # Reproducible vector-store build command
 tests/test_data.py                          # Deterministic data-pipeline tests
 tests/test_rag_ingestion.py                 # Offline ingestion and retrieval tests
+tests/test_rag_qa.py                        # Offline safeguard and prompt-chain tests
 data/structured/hdb_resale_transactions.csv # Official HDB resale transactions
 data/demo_resale_transactions.csv           # Development/error fallback
 data/rag_sources/                           # Curated official HDB PDF/TXT documents
@@ -96,4 +118,4 @@ python -m unittest discover -s tests
 
 ## Scope and limitations
 
-The Market Explorer is based on and only describes historical transactions. It does not predict prices, establish market value, calculate affordability, determine HDB eligibility, or provide financial or legal advice. If in doubt, please verify any information with official sources.
+The Market Explorer is based on and only describes historical transactions. It does not predict prices, establish market value, calculate affordability, determine HDB eligibility, or provide financial or legal advice. Ask ResaleReady is limited to general information grounded in its curated HDB knowledge base and does not make eligibility decisions or replace official HDB guidance. If in doubt, please verify any information with official sources.

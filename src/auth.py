@@ -39,4 +39,5 @@ def login_form() -> None:
 def logout() -> None:
     st.session_state.authenticated = False
     st.session_state.username = ""
+    st.session_state.pop("resaleready_chat_history", None)
     st.rerun()

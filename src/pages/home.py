@@ -7,15 +7,27 @@ def render() -> None:
         "A buyer-side navigator for understanding Singapore's HDB resale journey "
         "and exploring historical resale transactions."
     )
-    st.warning("For general information only. It is not financial, legal, or eligibility advice.")
+    st.warning(
+        "For general information only. It is not financial, legal, eligibility, "
+        "valuation, or price-prediction advice."
+    )
 
     left, right = st.columns(2)
     with left:
         st.subheader("📊 Market Explorer")
-        st.write("Filter historical transactions by town, flat type, period, and budget; then compare summary statistics and trends.")
+        st.write(
+            "Filter historical transactions by town, flat type, period, and budget; "
+            "then compare summary statistics and trends."
+        )
     with right:
         st.subheader("💬 Ask ResaleReady")
-        st.write("A future evidence-grounded Q&A assistant for official HDB resale guidance. The RAG component is intentionally not enabled yet.")
+        st.write(
+            "Ask buyer-side resale questions and receive concise answers grounded in "
+            "curated official HDB documents, with supporting source links."
+        )
 
-    st.subheader("Suggested next step")
-    st.write("Open **Market Explorer** from the sidebar. It runs with the official HDB resale transaction dataset.")
+    st.subheader("Get started")
+    st.write(
+        "Choose **Market Explorer** for historical transaction data or "
+        "**Ask ResaleReady** for official process information."
+    )
