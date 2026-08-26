@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.streamlit/secrets.toml
+data/resale_transactions.csv
+
+# ChatGPT project workspace files (not part of the application)
+AGENTS.md
+sources/

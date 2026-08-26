@@ -1,0 +1,1 @@
+"""ResaleReady SG application package."""
