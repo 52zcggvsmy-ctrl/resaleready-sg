@@ -18,4 +18,4 @@ def render() -> None:
         st.write("A future evidence-grounded Q&A assistant for official HDB resale guidance. The RAG component is intentionally not enabled yet.")
 
     st.subheader("Suggested next step")
-    st.write("Open **Market Explorer** from the sidebar. It runs immediately with the included demo dataset.")
+    st.write("Open **Market Explorer** from the sidebar. It runs with the official HDB resale transaction dataset.")

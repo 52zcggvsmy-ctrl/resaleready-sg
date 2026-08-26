@@ -5,9 +5,9 @@ A Streamlit prototype for prospective HDB resale flat buyers in Singapore.
 ## Current features
 
 - Prototype single-user login with session-state authentication
-- Historical transaction filtering by town, flat type, period, and price
-- Summary metrics, price visualisations, transaction table, and CSV export
-- CSV upload with an included demo-data fallback
+- Official HDB resale transaction filtering by town, flat type, period, and approximate budget
+- Summary metrics, monthly median-price trend, price distribution, transaction table, and CSV export
+- Robust CSV preprocessing with an included demo-data fallback
 - About Us and Methodology pages
 
 ## Quick start
@@ -32,25 +32,33 @@ This authentication is for demonstration of prototype only.
 
 The app selects data in this order:
 
-1. A CSV uploaded on the Market Explorer page.
-2. `data/resale_transactions.csv`, if present.
-3. The included `data/demo_resale_transactions.csv` fallback.
+1. A CSV supplied through the development override on the Market Explorer page.
+2. The official dataset at `data/structured/hdb_resale_transactions.csv`.
+3. The included `data/demo_resale_transactions.csv` fallback if the official file cannot be loaded.
 
-Download the official HDB resale flat prices CSV from data.gov.sg and save it as `data/resale_transactions.csv`. It is intentionally ignored by Git because the full dataset can be large and may be refreshed independently.
-
-Expected columns are `month`, `town`, `flat_type`, `block`, `street_name`, `storey_range`, `floor_area_sqm`, `flat_model`, `lease_commence_date`, and `resale_price`. Extra columns, including `remaining_lease`, are allowed.
+Expected columns are `month`, `town`, `flat_type`, `block`, `street_name`, `storey_range`, `floor_area_sqm`, `flat_model`, `lease_commence_date`, and `resale_price`. Extra columns, including `remaining_lease`, are allowed. Rows with missing, malformed, or non-positive core values are skipped and reported in the interface.
 
 ## Project structure
 
 ```text
-app.py                      # Entry point, navigation, authentication gate
-src/auth.py                 # Demo login and session state
-src/data.py                 # CSV loading, validation, normalisation, filtering
-src/pages/                  # Page-level UI modules
-src/rag/                    # Reserved boundary for later RAG integration
-data/demo_resale_transactions.csv
+app.py                                      # Entry point, navigation, authentication gate
+src/auth.py                                 # Demo login and session state
+src/data.py                                 # Loading, validation, filtering, and aggregation
+src/pages/                                  # Page-level UI modules
+src/rag/                                    # Reserved boundary for later RAG integration
+tests/test_data.py                          # Deterministic data-pipeline tests
+data/structured/hdb_resale_transactions.csv # Official HDB resale transactions
+data/demo_resale_transactions.csv           # Development/error fallback
 .streamlit/config.toml
 requirements.txt
+```
+
+## Validation
+
+Run the deterministic data tests with:
+
+```bash
+python -m unittest discover -s tests
 ```
 
 ## Scope and limitations
