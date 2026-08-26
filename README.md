@@ -26,12 +26,8 @@ python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Sign in with:
-
-- Username: `admin`
-- Password: `r3ady4r3sale=`
-
-This authentication is for demonstration of prototype only.
+Sign in using the prototype credentials shared separately with the assessor. This
+authentication is for demonstration of prototype only.
 
 ## Data
 

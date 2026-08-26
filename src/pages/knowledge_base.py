@@ -53,8 +53,8 @@ def _show_results(results: list[dict[str, Any]]) -> None:
 def render() -> None:
     st.title("📄 Knowledge Base")
     st.write(
-        "Upload PDF or UTF-8 TXT documents to demonstrate extraction, cleaning, "
-        "chunking, embedding, and retrieval. Uploads are available only in this "
+        "Upload only PDF or UTF-8 TXT files to bring in other external or own sources "
+        "of info for use in Ask ResaleReady. Uploads will be available only in this "
         "browser session and are not written to the repository."
     )
     st.info(

@@ -52,11 +52,11 @@ def _load_explanation_client(chat_model: str, _api_key: str) -> OpenAIResponsesC
 
 
 def _render_optional_explanation(context: MarketExplanationContext) -> None:
-    st.subheader("Optional AI explanation")
+    st.subheader("Need help understanding these figures?")
     st.write(
-        "Ask AI to explain the figures already calculated above. The model receives "
-        "only your selected filters and the displayed summary statistics—not individual "
-        "transaction records—and it does not recalculate them."
+        'Click on the "Explain these results" button to better understand the figures '
+        "and charts displayed via the selected filters. Note: The explanations will be "
+        "based on your selected filters and the displayed summary statistics."
     )
     st.caption(
         "Historical transaction data is indicative only. This explanation is not a "

@@ -26,9 +26,6 @@ def login_form() -> None:
         password = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Sign in", width="stretch")
 
-    with st.expander("Demo credentials"):
-        st.code("Username: admin\nPassword: r3ady4r3sale=")
-
     if submitted:
         if username == DEMO_USERNAME and password == DEMO_PASSWORD:
             st.session_state.authenticated = True

@@ -31,9 +31,9 @@ def _render_curated_sources() -> None:
 def render() -> None:
     st.title("ℹ️ About ResaleReady SG")
     st.write(
-        "**ResaleReady SG** is an AI Bootcamp capstone prototype that helps prospective "
-        "buyers understand Singapore's HDB resale journey and explore official "
-        "historical resale transactions in one accessible application."
+        "ResaleReady SG is a web-based application that helps prospective buyers "
+        "understand Singapore's HDB resale journey and explore official historical "
+        "resale transactions in one accessible application."
     )
     st.info(
         "The prototype combines deterministic data analysis with retrieval-augmented "
