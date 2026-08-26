@@ -23,8 +23,13 @@ Requires Python 3.10 or newer.
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 streamlit run app.py
 ```
+
+Before launching, edit `.streamlit/secrets.toml` and replace the example password
+with a new password that has never been committed to Git. The local secrets file is
+ignored by Git.
 
 Sign in using the prototype credentials shared separately with the assessor. This
 authentication is for demonstration of prototype only.
@@ -81,15 +86,23 @@ For Streamlit Community Cloud, add the following under the deployed app's **Sett
 ```toml
 OPENAI_API_KEY = "your-key"
 RESALEREADY_CHAT_MODEL = "gpt-5.6-luna"
+
+[auth]
+username = "admin"
+password = "a-new-password-that-has-never-been-committed"
 ```
 
-The model setting is optional. If the generated FAISS files are absent, the app builds the small curated knowledge base on the first Q&A or upload request and reuses it for later requests in the same deployment instance.
+The model setting is optional. The `[auth]` values are required and have no
+source-code defaults, so the application fails closed if they are missing. If the
+generated FAISS files are absent, the app builds the small curated knowledge base
+on the first Q&A or upload request and reuses it for later requests in the same
+deployment instance.
 
 ## Streamlit Community Cloud deployment
 
 1. Push the current repository to GitHub and confirm that `app.py`, `requirements.txt`, the official transaction CSV, and all files under `data/rag_sources/` are present.
 2. In [Streamlit Community Cloud](https://share.streamlit.io), choose **Create app** and select the repository, the deployment branch, and `app.py` as the entrypoint.
-3. Under **Advanced settings**, select Python 3.11 and paste the secrets block shown above. Do not add `.streamlit/secrets.toml` to Git; it is already covered by `.gitignore`.
+3. Under **Advanced settings**, select Python 3.11 and paste the secrets block shown above. Choose a new login password and do not add `.streamlit/secrets.toml` to Git; it is already covered by `.gitignore`.
 4. Deploy the app and wait for the Python dependencies in `requirements.txt` to install. No `packages.txt` system dependencies are required.
 5. Sign in with the demo credentials and open every page. The first Q&A or document-upload request may take longer because the small FAISS knowledge base is built when generated index files are absent.
 6. Confirm that Market Explorer metrics and charts load, Ask ResaleReady answers a normal HDB question with supporting sources, safeguard examples are refused, and the About Us and Methodology diagrams render.
@@ -128,7 +141,7 @@ python scripts/run_safeguard_checks.py
 ```text
 app.py                                      # Entry point, navigation, authentication gate
 src/app_config.py                           # Streamlit secret/environment configuration
-src/auth.py                                 # Demo login and session state
+src/auth.py                                 # Secrets-backed prototype login and session state
 src/data.py                                 # Loading, validation, filtering, and aggregation
 src/market_explanation.py                   # Statistics-only optional market explanation
 src/openai_client.py                        # OpenAI Responses API and safety identifier boundary
