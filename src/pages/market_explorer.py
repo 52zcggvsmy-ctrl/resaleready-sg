@@ -1,6 +1,9 @@
+import logging
+
 import pandas as pd
 import streamlit as st
 
+from src.app_config import secret_or_environment
 from src.data import (
     calculate_summary,
     filter_transactions,
@@ -10,6 +13,12 @@ from src.data import (
     valid_flat_types,
     valid_towns,
 )
+from src.market_explanation import (
+    MarketExplanationContext,
+    MarketExplanationError,
+    generate_market_explanation,
+)
+from src.openai_client import OpenAIResponsesClient
 
 
 FILTER_KEYS = (
@@ -18,6 +27,9 @@ FILTER_KEYS = (
     "market_budget",
     "market_period",
 )
+MARKET_EXPLANATION_STATE_KEY = "market_ai_explanation"
+DEFAULT_CHAT_MODEL = "gpt-5.6-luna"
+LOGGER = logging.getLogger(__name__)
 
 
 def _money(value: float) -> str:
@@ -31,6 +43,71 @@ def _default_option(options: list[str], preferred: str) -> str:
 def _reset_filters(defaults: dict) -> None:
     for key in FILTER_KEYS:
         st.session_state[key] = defaults[key]
+    st.session_state.pop(MARKET_EXPLANATION_STATE_KEY, None)
+
+
+@st.cache_resource(show_spinner=False)
+def _load_explanation_client(chat_model: str, _api_key: str) -> OpenAIResponsesClient:
+    return OpenAIResponsesClient(api_key=_api_key, model=chat_model)
+
+
+def _render_optional_explanation(context: MarketExplanationContext) -> None:
+    st.subheader("Optional AI explanation")
+    st.write(
+        "Ask AI to explain the figures already calculated above. The model receives "
+        "only your selected filters and the displayed summary statistics—not individual "
+        "transaction records—and it does not recalculate them."
+    )
+    st.caption(
+        "Historical transaction data is indicative only. This explanation is not a "
+        "property valuation, price forecast, purchase recommendation, or financial advice."
+    )
+
+    api_key = secret_or_environment("OPENAI_API_KEY")
+    chat_model = secret_or_environment("RESALEREADY_CHAT_MODEL", DEFAULT_CHAT_MODEL)
+    if not api_key:
+        st.info(
+            "Configure `OPENAI_API_KEY` in Streamlit Secrets or the local environment "
+            "to enable this optional explanation."
+        )
+
+    if st.button(
+        "✨ Explain these results",
+        disabled=not api_key,
+        help="Generates a short explanation from the displayed filters and statistics.",
+    ):
+        st.session_state.pop(MARKET_EXPLANATION_STATE_KEY, None)
+        try:
+            with st.spinner("Explaining the historical results..."):
+                client = _load_explanation_client(chat_model, api_key)
+                explanation = generate_market_explanation(client, context)
+        except (MarketExplanationError, RuntimeError, ValueError):
+            LOGGER.exception("Unable to generate a validated market explanation.")
+            st.error(
+                "A safe explanation could not be generated just now. The calculated "
+                "metrics and charts above remain available and unchanged."
+            )
+        except Exception:
+            LOGGER.exception("OpenAI market explanation request failed.")
+            st.error(
+                "The optional AI explanation is temporarily unavailable. The calculated "
+                "metrics and charts above remain available and unchanged."
+            )
+        else:
+            st.session_state[MARKET_EXPLANATION_STATE_KEY] = {
+                "signature": context.signature,
+                "content": explanation,
+            }
+
+    stored = st.session_state.get(MARKET_EXPLANATION_STATE_KEY)
+    if isinstance(stored, dict) and stored.get("signature") == context.signature:
+        with st.container(border=True):
+            st.markdown("**AI explanation of indicative historical transactions**")
+            st.write(str(stored.get("content", "")))
+            st.caption(
+                "The explanation interprets fixed Pandas results; it does not alter any "
+                "calculation shown on this page."
+            )
 
 
 def _initialise_filter_state(frame: pd.DataFrame) -> dict:
@@ -210,6 +287,20 @@ def render() -> None:
             x_label="Resale-price band",
             y_label="Transactions",
         )
+
+    explanation_context = MarketExplanationContext(
+        town=town,
+        flat_type=flat_type,
+        period_start=period[0].strftime("%B %Y"),
+        period_end=period[1].strftime("%B %Y"),
+        budget=float(budget),
+        transaction_count=summary.transaction_count,
+        median_resale_price=summary.median_resale_price,
+        median_floor_area_sqm=summary.median_floor_area_sqm,
+        within_budget_count=within_budget_count,
+        within_budget_percentage=summary.within_budget_percentage,
+    )
+    _render_optional_explanation(explanation_context)
 
     st.subheader("Transaction details")
     st.caption(

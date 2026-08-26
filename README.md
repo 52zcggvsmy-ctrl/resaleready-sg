@@ -7,6 +7,7 @@ A Streamlit prototype for prospective HDB resale flat buyers in Singapore.
 - Prototype single-user login with session-state authentication
 - Official HDB resale transaction filtering by town, flat type, period, and approximate budget
 - Summary metrics, monthly median-price trend, price distribution, transaction table, and CSV export
+- Optional AI explanation using only selected filters and Pandas-computed statistics
 - Robust CSV preprocessing with an included demo-data fallback
 - Curated HDB document ingestion, token-aware chunking, and FAISS retrieval foundation
 - Conversation-aware, source-grounded HDB resale Q&A
@@ -122,6 +123,7 @@ app.py                                      # Entry point, navigation, authentic
 src/app_config.py                           # Streamlit secret/environment configuration
 src/auth.py                                 # Demo login and session state
 src/data.py                                 # Loading, validation, filtering, and aggregation
+src/market_explanation.py                   # Statistics-only optional market explanation
 src/openai_client.py                        # OpenAI Responses API and safety identifier boundary
 src/prompts.py                              # Isolated rewrite and grounded-answer instructions
 src/pages/knowledge_base.py                 # Administrative upload demonstration

@@ -110,6 +110,7 @@ def render() -> None:
             "- Cached loading and robust preprocessing of the transaction CSV\n"
             "- Dynamic town, flat-type, budget, and date controls\n"
             "- Deterministic summary statistics and interactive charts\n"
+            "- Optional statistics-only AI explanation of displayed market results\n"
             "- Downloadable filtered transaction table"
         )
     with feature_col_two:

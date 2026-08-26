@@ -62,11 +62,18 @@ digraph market_workflow {
     metrics [label="Deterministic calculations\ncount · medians · % at/below budget"];
     outputs [label="Monthly median trend\nprice distribution · clean table"];
     display [label="Streamlit metrics and charts\nSingapore-dollar formatting · CSV download", fillcolor="#DDEBF7"];
+    ai_request [shape=diamond, label="AI explanation\nrequested?", fillcolor="#FFF2CC"];
+    ai_input [label="Send selected filters +\nalready-computed statistics only"];
+    ai_explain [label="OpenAI explains indicative\nhistorical results within limits", fillcolor="#E2F0D9"];
+    complete [label="Results remain available\nwithout changing calculations", fillcolor="#DDEBF7"];
 
     csv -> cache -> clean -> options -> filters -> filter -> matches;
     matches -> empty [label=" no "];
     matches -> metrics [label=" yes "];
-    metrics -> outputs -> display;
+    metrics -> outputs -> display -> ai_request;
+    ai_request -> ai_input [label=" yes "];
+    ai_request -> complete [label=" no "];
+    ai_input -> ai_explain -> complete;
 }
 """
 
@@ -262,6 +269,16 @@ def render() -> None:
         "and a newest-first table. Users can download the filtered records as CSV. If no "
         "rows match, the page shows guidance instead of attempting calculations. No LLM "
         "is used for any Market Explorer number, filter, table, or chart."
+    )
+    st.write(
+        "The optional **Explain these results** button calls the existing OpenAI Responses "
+        "client only when requested. Its JSON input contains the selected town, flat type, "
+        "period, and budget plus the already-computed summary metrics. It does not contain "
+        "transaction rows or ask the model to calculate anything. The dedicated prompt "
+        "allows only an explanation of the historical results and budget statistic, requires "
+        "an indicative-data limitation, and prohibits valuations, forecasts, purchase "
+        "recommendations, and financial advice. Output checks reject new figures or "
+        "prohibited recommendations before display."
     )
 
     st.subheader("Flowchart 2 — HDB Resale Market Explorer workflow")
