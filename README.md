@@ -89,6 +89,17 @@ RESALEREADY_CHAT_MODEL = "gpt-5.6-luna"
 
 The model setting is optional. If the generated FAISS files are absent, the app builds the small curated knowledge base on the first Q&A or upload request and reuses it for later requests in the same deployment instance.
 
+## Streamlit Community Cloud deployment
+
+1. Push the current repository to GitHub and confirm that `app.py`, `requirements.txt`, the official transaction CSV, and all files under `data/rag_sources/` are present.
+2. In [Streamlit Community Cloud](https://share.streamlit.io), choose **Create app** and select the repository, the deployment branch, and `app.py` as the entrypoint.
+3. Under **Advanced settings**, select Python 3.11 and paste the secrets block shown above. Do not add `.streamlit/secrets.toml` to Git; it is already covered by `.gitignore`.
+4. Deploy the app and wait for the Python dependencies in `requirements.txt` to install. No `packages.txt` system dependencies are required.
+5. Sign in with the demo credentials and open every page. The first Q&A or document-upload request may take longer because the small FAISS knowledge base is built when generated index files are absent.
+6. Confirm that Market Explorer metrics and charts load, Ask ResaleReady answers a normal HDB question with supporting sources, safeguard examples are refused, and the About Us and Methodology diagrams render.
+
+Generated FAISS files and session uploads are intentionally ephemeral on Community Cloud. Curated PDF/TXT sources remain in Git, so the index can be rebuilt after an app restart.
+
 ## Knowledge Base upload demo
 
 After signing in, open **Knowledge Base** to upload PDF or UTF-8 TXT files. Each file is limited to 10 MB and passes through validation, text extraction, cleaning, 850-token chunking with 120-token overlap, OpenAI embedding, and addition to an in-memory FAISS index.
