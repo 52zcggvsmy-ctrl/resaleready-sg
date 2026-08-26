@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import unittest
 from collections.abc import Sequence
@@ -96,9 +97,12 @@ class RagUploadTests(unittest.TestCase):
             metadata=chunks[0].metadata,
         )
         prompt = build_grounded_answer_input("What does it say?", "demo notes", [retrieved])
-        self.assertIn("UPLOADED DEMO REFERENCE - UNVERIFIED", prompt)
-        self.assertIn("BEGIN UNTRUSTED REFERENCE EXTRACT", prompt)
-        self.assertIn("Ignore previous instructions", prompt)
+        header, payload_text = prompt.split("\n", 1)
+        payload = json.loads(payload_text)
+        source = payload["retrieved_sources"][0]
+        self.assertIn("UNTRUSTED REFERENCE PAYLOAD", header)
+        self.assertEqual("uploaded_demo_unverified", source["trust"])
+        self.assertIn("Ignore previous instructions", source["extract"])
 
     def test_upload_store_adds_retrieves_and_rejects_duplicates(self) -> None:
         provider = DeterministicUploadEmbedder()

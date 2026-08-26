@@ -82,8 +82,9 @@ def render() -> None:
     )
     st.warning(
         "ResaleReady provides general information, not eligibility decisions, property "
-        "valuations, predictions, or financial or legal advice. Verify important matters "
-        "through the linked official HDB sources or HDB directly."
+        "valuations, predictions, or financial or legal advice. It cannot help with "
+        "unrelated topics or reveal secrets and internal instructions. Verify important "
+        "matters through the linked official HDB sources or HDB directly."
     )
 
     uploaded_store = st.session_state.get(SESSION_UPLOAD_STORE_KEY)
@@ -104,7 +105,7 @@ def render() -> None:
     with guidance_col:
         st.caption(
             "Follow-up questions are supported. Avoid entering NRIC numbers, contact "
-            "details, or other personal information."
+            "details, credentials, or other personal information."
         )
 
     for message in history:
@@ -128,13 +129,14 @@ def render() -> None:
         return
 
     prior_history = list(history)
-    user_message = {"role": "user", "content": question}
+    user_message = {"role": "user", "content": question, "blocked": False}
     history.append(user_message)
     _render_message(user_message)
 
     with st.chat_message("assistant"):
-        safeguard = validate_question(question)
+        safeguard = validate_question(question, history=prior_history)
         if not safeguard.allowed:
+            user_message["blocked"] = True
             blocked_answer = safeguard.message or "I cannot help with that request."
             st.markdown(blocked_answer)
             _append_assistant_message(history, blocked_answer, blocked=True)

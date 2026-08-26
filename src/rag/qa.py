@@ -16,35 +16,22 @@ from src.prompts import (
 )
 
 from .models import RetrievedChunk
-
-MAX_QUESTION_CHARACTERS = 1_000
-MIN_QUESTION_CHARACTERS = 3
-
-_PROMPT_INJECTION_PATTERNS = (
-    r"ignore (?:all |the )?(?:previous|prior|system) instructions",
-    r"reveal (?:the )?(?:system|developer) prompt",
-    r"show (?:me )?(?:your )?(?:hidden|system|developer) instructions",
-    r"jailbreak",
+from .safeguards import (
+    INSUFFICIENT_EVIDENCE_MESSAGE,
+    MAX_QUESTION_CHARACTERS,
+    SECURITY_BLOCK_MESSAGE,
+    SENSITIVE_OUTPUT_MESSAGE,
+    SafeguardResult,
+    normalize_user_text,
+    screen_model_output,
+    validate_question,
+    validate_retrieval_query,
 )
-_VALUATION_PATTERNS = (
-    r"(?:what is|what's|estimate|calculate|tell me) (?:my |this |the )?flat(?:'s)? (?:value|valuation|worth)",
-    r"how much is (?:my|this|the) flat worth",
-    r"predict (?:the )?(?:resale )?price",
-)
-_ADVICE_PATTERNS = (
-    r"(?:give|provide) (?:me )?(?:financial|legal) advice",
-    r"which (?:bank |home )?(?:loan|mortgage) should i (?:choose|take)",
-    r"should i (?:buy|sell|sign|sue|borrow)",
-)
-_NRIC_PATTERN = re.compile(r"\b[STFGM]\d{7}[A-Z]\b", re.IGNORECASE)
-_EMAIL_PATTERN = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b")
-_PHONE_PATTERN = re.compile(r"(?<!\d)(?:\+65[ -]?)?[689]\d{7}(?!\d)")
 
-
-@dataclass(frozen=True)
-class SafeguardResult:
-    allowed: bool
-    message: str | None = None
+_ANSWER_PROTOCOL_PATTERN = re.compile(
+    r"^\s*(SUPPORTED|INSUFFICIENT)\s*:\s*", re.IGNORECASE
+)
+_CITATION_PATTERN = re.compile(r"\[Source (\d+)\]", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -64,52 +51,6 @@ class QAResult:
     retrieval_query: str
     sources: tuple[AnswerSource, ...]
     blocked: bool = False
-
-
-def validate_question(question: str) -> SafeguardResult:
-    """Apply deterministic input, privacy, and scope safeguards before any API call."""
-
-    normalized = " ".join(question.split())
-    if len(normalized) < MIN_QUESTION_CHARACTERS:
-        return SafeguardResult(False, "Please enter a complete question.")
-    if len(normalized) > MAX_QUESTION_CHARACTERS:
-        return SafeguardResult(
-            False,
-            f"Please shorten your question to {MAX_QUESTION_CHARACTERS:,} characters or fewer.",
-        )
-    if any(
-        pattern.search(normalized)
-        for pattern in (_NRIC_PATTERN, _EMAIL_PATTERN, _PHONE_PATTERN)
-    ):
-        return SafeguardResult(
-            False,
-            "Please remove personal information such as NRIC numbers, phone numbers, or email addresses before asking.",
-        )
-    if any(
-        re.search(pattern, normalized, re.IGNORECASE)
-        for pattern in _PROMPT_INJECTION_PATTERNS
-    ):
-        return SafeguardResult(
-            False,
-            "I can help with the buyer-side HDB resale journey, but I cannot reveal or override system instructions.",
-        )
-    if any(
-        re.search(pattern, normalized, re.IGNORECASE)
-        for pattern in _VALUATION_PATTERNS
-    ):
-        return SafeguardResult(
-            False,
-            "ResaleReady cannot value a property or predict its price. You can use the Market Explorer to review historical transactions, but those records are not a valuation.",
-        )
-    if any(
-        re.search(pattern, normalized, re.IGNORECASE)
-        for pattern in _ADVICE_PATTERNS
-    ):
-        return SafeguardResult(
-            False,
-            "ResaleReady cannot provide financial or legal advice or recommend a purchase, loan, or legal decision. Please consult an appropriately qualified professional or official channel.",
-        )
-    return SafeguardResult(True)
 
 
 def _deduplicate_sources(chunks: Sequence[RetrievedChunk]) -> tuple[AnswerSource, ...]:
@@ -142,25 +83,23 @@ def _deduplicate_sources(chunks: Sequence[RetrievedChunk]) -> tuple[AnswerSource
     return tuple(sources)
 
 
-def _sources_cited_in_answer(
-    answer: str, chunks: Sequence[RetrievedChunk]
-) -> tuple[AnswerSource, ...]:
-    """Display only retrieved chunks that the grounded answer actually cites."""
+def _cited_positions(answer: str) -> set[int]:
+    return {int(position) for position in _CITATION_PATTERN.findall(answer)}
 
-    cited_positions = {
-        int(position)
-        for position in re.findall(r"\[Source (\d+)\]", answer, re.IGNORECASE)
-    }
+
+def _sources_for_positions(
+    positions: set[int], chunks: Sequence[RetrievedChunk]
+) -> tuple[AnswerSource, ...]:
     cited_chunks = [
         chunk
         for position, chunk in enumerate(chunks, start=1)
-        if position in cited_positions
+        if position in positions
     ]
     return _deduplicate_sources(cited_chunks)
 
 
 class ResaleReadyQA:
-    """Run input checks, follow-up rewriting, retrieval, and grounded generation."""
+    """Run validation, rewriting, retrieval, grounded generation, and output checks."""
 
     def __init__(
         self,
@@ -179,14 +118,17 @@ class ResaleReadyQA:
         self, question: str, history: Sequence[dict[str, Any]]
     ) -> str:
         if not history:
-            return question.strip()
+            return normalize_user_text(question)
         rewritten = self.text_generator.generate(
             instructions=REWRITE_SYSTEM_PROMPT,
             input_text=build_rewrite_input(question, history),
             max_output_tokens=160,
         )
-        rewritten = " ".join(rewritten.split())[:MAX_QUESTION_CHARACTERS].strip()
-        return rewritten or question.strip()
+        rewritten = normalize_user_text(rewritten)[:MAX_QUESTION_CHARACTERS]
+        rewrite_guard = validate_retrieval_query(rewritten)
+        if not rewrite_guard.allowed:
+            return normalize_user_text(question)
+        return rewrite_guard.normalized_text or normalize_user_text(question)
 
     def answer(
         self,
@@ -194,24 +136,74 @@ class ResaleReadyQA:
         *,
         history: Sequence[dict[str, Any]] = (),
     ) -> QAResult:
-        safeguard = validate_question(question)
+        safeguard = validate_question(question, history=history)
         if not safeguard.allowed:
             return QAResult(
-                answer=safeguard.message or "I cannot help with that request.",
+                answer=safeguard.message or SECURITY_BLOCK_MESSAGE,
                 retrieval_query="",
                 sources=(),
                 blocked=True,
             )
 
-        retrieval_query = self._rewrite_query(question, history)
+        retrieval_query = self._rewrite_query(safeguard.normalized_text, history)
         chunks = self.retrieve_chunks(retrieval_query, self.top_k)
-        answer = self.text_generator.generate(
+        if not chunks:
+            return QAResult(
+                answer=INSUFFICIENT_EVIDENCE_MESSAGE,
+                retrieval_query=retrieval_query,
+                sources=(),
+            )
+
+        raw_answer = self.text_generator.generate(
             instructions=ANSWER_SYSTEM_PROMPT,
-            input_text=build_grounded_answer_input(question, retrieval_query, chunks),
+            input_text=build_grounded_answer_input(
+                safeguard.normalized_text,
+                retrieval_query,
+                chunks,
+            ),
             max_output_tokens=900,
         )
+        output_guard = screen_model_output(raw_answer)
+        if not output_guard.allowed:
+            return QAResult(
+                answer=output_guard.message or SENSITIVE_OUTPUT_MESSAGE,
+                retrieval_query=retrieval_query,
+                sources=(),
+                blocked=True,
+            )
+
+        answer = output_guard.normalized_text
+        protocol_match = _ANSWER_PROTOCOL_PATTERN.match(answer)
+        if protocol_match:
+            status = protocol_match.group(1).upper()
+            answer = answer[protocol_match.end() :].strip()
+            if status == "INSUFFICIENT":
+                return QAResult(
+                    answer=INSUFFICIENT_EVIDENCE_MESSAGE,
+                    retrieval_query=retrieval_query,
+                    sources=(),
+                )
+
+        positions = _cited_positions(answer)
+        valid_positions = set(range(1, len(chunks) + 1))
+        if not positions or not positions.issubset(valid_positions):
+            return QAResult(
+                answer=INSUFFICIENT_EVIDENCE_MESSAGE,
+                retrieval_query=retrieval_query,
+                sources=(),
+            )
+
         return QAResult(
             answer=answer,
             retrieval_query=retrieval_query,
-            sources=_sources_cited_in_answer(answer, chunks),
+            sources=_sources_for_positions(positions, chunks),
         )
+
+
+__all__ = [
+    "AnswerSource",
+    "QAResult",
+    "ResaleReadyQA",
+    "SafeguardResult",
+    "validate_question",
+]

@@ -13,14 +13,16 @@ def render() -> None:
         "- Source-grounded buyer-side HDB resale Q&A\n"
         "- Follow-up questions with conversation-aware retrieval\n"
         "- Administrative PDF/TXT upload demonstration with session-only retrieval\n"
+        "- Layered input, prompt-injection, grounding, and output safeguards\n"
         "- Public, non-personally identifiable inputs only"
     )
     st.subheader("Important limitations")
     st.write(
         "This prototype does not determine eligibility, grants, loan amounts, "
         "valuation, affordability, or whether a buyer should proceed with a purchase. "
-        "Its Q&A coverage is primarily based on the curated HDB documents in its "
-        "knowledge base. Uploaded demo documents are unverified, session-only "
-        "references. Users should verify current rules with HDB and other relevant "
-        "agencies."
+        "Its Q&A is restricted to buyer-side HDB resale information and grounded "
+        "primarily in curated HDB documents. Uploaded demo documents are unverified, "
+        "session-only references. Safeguards reduce but cannot eliminate LLM error or "
+        "prompt-injection risk. Users should verify current rules with HDB and other "
+        "relevant agencies."
     )

@@ -9,7 +9,8 @@ A Streamlit prototype for prospective HDB resale flat buyers in Singapore.
 - Summary metrics, monthly median-price trend, price distribution, transaction table, and CSV export
 - Robust CSV preprocessing with an included demo-data fallback
 - Curated HDB document ingestion, token-aware chunking, and FAISS retrieval foundation
-- Conversation-aware, source-grounded HDB resale Q&A with safeguards
+- Conversation-aware, source-grounded HDB resale Q&A
+- Layered domain, privacy, prompt-injection, disclosure, grounding, and output safeguards
 - Administrative PDF/TXT upload demonstration with a session-only FAISS index
 - About Us and Methodology pages
 
@@ -93,6 +94,27 @@ After signing in, open **Knowledge Base** to upload PDF or UTF-8 TXT files. Each
 
 Uploaded documents are unverified, session-only reference material. Their original files are not written to the repository, they are removed on logout or when the session/app ends, and they are never treated as executable instructions or official HDB policy. During Q&A, curated official HDB sources keep the majority of retrieval slots and appear before uploaded references.
 
+## LLM safeguards
+
+Ask ResaleReady uses layered safeguards rather than relying on keyword blocking alone:
+
+- deterministic domain, input-structure, privacy, injection, and disclosure checks before model access;
+- conversation-aware validation for legitimate follow-up questions;
+- stable model instructions separated from an untrusted JSON payload containing the question and retrieved sources;
+- explicit treatment of document text and metadata as reference data, never instructions;
+- no API key, credential, environment, or configuration values included in model input;
+- valid retrieved-source citations required for supported answers;
+- deterministic fallback for absent, insufficient, uncited, or invalidly cited evidence; and
+- generated-output screening for secret-like values and internal-policy leakage.
+
+The complete requirement mapping, expected adversarial behaviour, limitations, and manual procedure are documented in `docs/SAFEGUARDS.md`.
+
+Run the documented safeguard set without an API key:
+
+```bash
+python scripts/run_safeguard_checks.py
+```
+
 ## Project structure
 
 ```text
@@ -100,17 +122,22 @@ app.py                                      # Entry point, navigation, authentic
 src/app_config.py                           # Streamlit secret/environment configuration
 src/auth.py                                 # Demo login and session state
 src/data.py                                 # Loading, validation, filtering, and aggregation
-src/openai_client.py                        # Reusable OpenAI Responses API boundary
-src/prompts.py                              # Follow-up rewrite and grounded-answer prompts
+src/openai_client.py                        # OpenAI Responses API and safety identifier boundary
+src/prompts.py                              # Isolated rewrite and grounded-answer instructions
 src/pages/knowledge_base.py                 # Administrative upload demonstration
 src/pages/                                  # Other page-level UI modules
+src/rag/safeguards.py                       # Deterministic input and output safeguards
 src/rag/uploads.py                          # Upload validation and in-memory FAISS index
 src/rag/                                    # Ingestion, retrieval, safeguards, and Q&A chain
 scripts/build_vector_store.py               # Reproducible curated vector-store build command
+scripts/run_safeguard_checks.py             # Offline documented adversarial checks
+tests/safeguard_cases.json                  # Machine-readable safeguard examples
 tests/test_data.py                          # Deterministic data-pipeline tests
 tests/test_rag_ingestion.py                 # Offline ingestion and retrieval tests
-tests/test_rag_qa.py                        # Offline safeguard and prompt-chain tests
+tests/test_rag_qa.py                        # Offline prompt-chain tests
+tests/test_rag_safeguards.py                # Offline adversarial and fallback tests
 tests/test_rag_uploads.py                   # Offline upload validation and retrieval tests
+docs/SAFEGUARDS.md                          # Safeguard design and expected behaviour
 data/structured/hdb_resale_transactions.csv # Official HDB resale transactions
 data/demo_resale_transactions.csv           # Development/error fallback
 data/rag_sources/                           # Curated official HDB PDF/TXT documents
@@ -129,4 +156,4 @@ python -m unittest discover -s tests
 
 ## Scope and limitations
 
-The Market Explorer is based on and only describes historical transactions. It does not predict prices, establish market value, calculate affordability, determine HDB eligibility, or provide financial or legal advice. Ask ResaleReady is limited to general information grounded primarily in its curated HDB knowledge base and does not make eligibility decisions or replace official HDB guidance. Uploaded demo documents are unverified references and must be checked against official sources. If in doubt, please verify any information with official sources.
+The Market Explorer is based on and only describes historical transactions. It does not predict prices, establish market value, calculate affordability, determine HDB eligibility, or provide financial or legal advice. Ask ResaleReady is limited to general buyer-side HDB resale information grounded primarily in its curated HDB knowledge base and does not make eligibility decisions or replace official HDB guidance. Uploaded demo documents are unverified references and must be checked against official sources. Safeguards reduce but cannot eliminate LLM error or prompt-injection risk. If in doubt, please verify any information with official sources.
