@@ -179,7 +179,10 @@ def resale_price_distribution(frame: pd.DataFrame, bin_width: int = 50_000) -> p
     minimum = int(frame["resale_price"].min() // bin_width * bin_width)
     maximum = int(frame["resale_price"].max() // bin_width * bin_width + bin_width)
     edges = list(range(minimum, maximum + bin_width, bin_width))
-    labels = [f"S${left // 1_000}k–{right // 1_000}k" for left, right in zip(edges, edges[1:])]
+    def compact_price(value: int) -> str:
+        return f"{value / 1_000_000:.2f}m" if value >= 1_000_000 else f"{value // 1_000}k"
+
+    labels = [f"S${compact_price(left)}–{compact_price(right)}" for left, right in zip(edges, edges[1:])]
     bands = pd.cut(
         frame["resale_price"],
         bins=edges,

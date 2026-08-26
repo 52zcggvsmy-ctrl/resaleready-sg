@@ -32,9 +32,8 @@ This authentication is for demonstration of prototype only.
 
 The app selects data in this order:
 
-1. A CSV supplied through the development override on the Market Explorer page.
-2. The official dataset at `data/structured/hdb_resale_transactions.csv`.
-3. The included `data/demo_resale_transactions.csv` fallback if the official file cannot be loaded.
+1. The official dataset at `data/structured/hdb_resale_transactions.csv`.
+2. The included `data/demo_resale_transactions.csv` fallback if the official file cannot be loaded.
 
 Expected columns are `month`, `town`, `flat_type`, `block`, `street_name`, `storey_range`, `floor_area_sqm`, `flat_model`, `lease_commence_date`, and `resale_price`. Extra columns, including `remaining_lease`, are allowed. Rows with missing, malformed, or non-positive core values are skipped and reported in the interface.
 

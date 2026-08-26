@@ -12,32 +12,87 @@ from src.data import (
 )
 
 
+FILTER_KEYS = (
+    "market_town",
+    "market_flat_type",
+    "market_budget",
+    "market_period",
+)
+
+
 def _money(value: float) -> str:
     return f"S${value:,.0f}"
 
 
-def _default_index(options: list[str], preferred: str) -> int:
-    return options.index(preferred) if preferred in options else 0
+def _default_option(options: list[str], preferred: str) -> str:
+    return preferred if preferred in options else options[0]
+
+
+def _reset_filters(defaults: dict) -> None:
+    for key in FILTER_KEYS:
+        st.session_state[key] = defaults[key]
+
+
+def _initialise_filter_state(frame: pd.DataFrame) -> dict:
+    town_options = valid_towns(frame)
+    default_town = _default_option(town_options, "ANG MO KIO")
+    default_flat_type = _default_option(valid_flat_types(frame, default_town), "4 ROOM")
+
+    price_step = 10_000
+    price_floor = int(frame["resale_price"].min() // price_step * price_step)
+    price_ceiling = int(frame["resale_price"].max() // price_step * price_step + price_step)
+    budget_options = list(range(price_floor, price_ceiling + price_step, price_step))
+    default_budget = int(round(frame["resale_price"].median() / price_step) * price_step)
+    default_budget = min(max(default_budget, price_floor), price_ceiling)
+
+    month_options = sorted(frame["month"].drop_duplicates().tolist())
+    defaults = {
+        "market_town": default_town,
+        "market_flat_type": default_flat_type,
+        "market_budget": default_budget,
+        "market_period": (month_options[0], month_options[-1]),
+    }
+
+    if st.session_state.get("market_town") not in town_options:
+        st.session_state.market_town = default_town
+    current_flat_types = valid_flat_types(frame, st.session_state.market_town)
+    if st.session_state.get("market_flat_type") not in current_flat_types:
+        st.session_state.market_flat_type = _default_option(current_flat_types, "4 ROOM")
+    if st.session_state.get("market_budget") not in budget_options:
+        st.session_state.market_budget = default_budget
+    current_period = st.session_state.get("market_period")
+    if (
+        not isinstance(current_period, (tuple, list))
+        or len(current_period) != 2
+        or any(value not in month_options for value in current_period)
+    ):
+        st.session_state.market_period = defaults["market_period"]
+
+    return {
+        "town_options": town_options,
+        "budget_options": budget_options,
+        "month_options": month_options,
+        "defaults": defaults,
+    }
 
 
 def render() -> None:
     st.title("📊 HDB Resale Market Explorer")
-    st.caption(
-        "Explore official historical transactions. Past prices do not predict future prices "
-        "or establish a flat's valuation."
+    st.write(
+        "See what similar HDB resale flats have sold for using official historical "
+        "transaction records. Choose a town, flat type, budget, and period to explore the market."
+    )
+    st.warning(
+        "Historical resale transactions are indicative only. They are not property valuations "
+        "or price predictions and should not be the sole basis for a purchase decision."
     )
 
-    with st.expander("Development data override"):
-        uploaded = st.file_uploader(
-            "Optional HDB resale CSV",
-            type="csv",
-            help="The official structured dataset is used by default. Uploading a file overrides it for this session.",
-        )
-
     try:
-        result = load_transactions(uploaded)
+        with st.spinner("Loading HDB resale transactions…", show_time=True):
+            result = load_transactions()
     except (ValueError, RuntimeError, OSError, pd.errors.ParserError, UnicodeDecodeError) as error:
         st.error(f"Transaction data could not be loaded. {error}")
+        st.info("Confirm that the official transaction CSV is available, then reload the page.")
         return
 
     if result.is_demo:
@@ -45,83 +100,108 @@ def render() -> None:
             f"Development fallback: using **{result.source_name}** because the official dataset "
             f"could not be loaded ({result.fallback_reason})."
         )
-    else:
-        st.success(f"Loaded **{result.source_name}** ({len(result.data):,} valid transactions).")
     if result.rows_dropped:
         st.warning(f"Skipped {result.rows_dropped:,} malformed or incomplete rows during preprocessing.")
 
     frame = result.data
-    min_date = frame["month"].min().date()
-    max_date = frame["month"].max().date()
-    price_step = 10_000
-    price_floor = int(frame["resale_price"].min() // price_step * price_step)
-    price_ceiling = int(frame["resale_price"].max() // price_step * price_step + price_step)
-    budget_options = list(range(price_floor, price_ceiling + price_step, price_step))
-    median_budget = int(round(frame["resale_price"].median() / price_step) * price_step)
+    dataset_start = frame["month"].min()
+    dataset_end = frame["month"].max()
+    source_label = "demo fallback" if result.is_demo else "official HDB resale transactions"
+    st.caption(
+        f"Data source: {source_label} · {len(frame):,} valid records · "
+        f"{dataset_start:%B %Y} to {dataset_end:%B %Y}"
+    )
 
-    with st.sidebar:
-        st.subheader("Explorer filters")
-        town_options = valid_towns(frame)
-        town = st.selectbox("Town", town_options)
+    filter_state = _initialise_filter_state(frame)
+    header, reset = st.columns([5, 1])
+    with header:
+        st.subheader("Find relevant past transactions")
+        st.caption("Filters update the results below. Budget is used for comparison, not to hide higher-priced sales.")
+    with reset:
+        st.button(
+            "↺ Reset filters",
+            on_click=_reset_filters,
+            args=(filter_state["defaults"],),
+            width="stretch",
+        )
+
+    with st.container(border=True):
+        first, second, third = st.columns(3)
+        with first:
+            town = st.selectbox(
+                "Town",
+                filter_state["town_options"],
+                key="market_town",
+                help="Select the HDB town you are considering.",
+            )
         flat_type_options = valid_flat_types(frame, town)
-        flat_type = st.selectbox(
-            "Flat type",
-            flat_type_options,
-            index=_default_index(flat_type_options, "4 ROOM"),
+        if st.session_state.market_flat_type not in flat_type_options:
+            st.session_state.market_flat_type = _default_option(flat_type_options, "4 ROOM")
+        with second:
+            flat_type = st.selectbox(
+                "Flat type",
+                flat_type_options,
+                key="market_flat_type",
+                help="Only flat types with transactions in the selected town are shown.",
+            )
+        with third:
+            budget = st.select_slider(
+                "Approximate budget",
+                options=filter_state["budget_options"],
+                format_func=_money,
+                key="market_budget",
+                help="Used to calculate the share of matching sales at or below your budget.",
+            )
+        period = st.select_slider(
+            "Transaction period",
+            options=filter_state["month_options"],
+            format_func=lambda value: value.strftime("%b %Y"),
+            key="market_period",
+            help="Choose the first and last transaction months to include.",
         )
-        budget = st.select_slider(
-            "Approximate budget",
-            options=budget_options,
-            value=min(max(median_budget, price_floor), price_ceiling),
-            format_func=_money,
-        )
-        period = st.date_input(
-            "Period of interest",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date,
-        )
-
-    if len(period) != 2:
-        st.info("Choose both a start and end date for the period of interest.")
-        return
+        st.caption(f"Selected period: **{period[0]:%B %Y} to {period[1]:%B %Y}**")
 
     filtered = filter_transactions(frame, town, flat_type, period[0], period[1])
     if filtered.empty:
-        st.warning(
-            "No historical transactions match this town, flat type, and period. "
-            "Try widening the period or selecting a different combination."
+        st.info(
+            "No recorded transactions match this town, flat type, and period. "
+            "Try a wider period, another flat type, or reset the filters."
         )
         return
 
     summary = calculate_summary(filtered, budget)
+    within_budget_count = int(filtered["resale_price"].le(budget).sum())
+
+    st.subheader("At a glance")
     a, b, c, d = st.columns(4)
-    a.metric("Transactions", f"{summary.transaction_count:,}")
+    a.metric("Matching transactions", f"{summary.transaction_count:,}")
     b.metric("Median resale price", _money(summary.median_resale_price))
     c.metric("Median floor area", f"{summary.median_floor_area_sqm:,.0f} m²")
     d.metric(
-        "At or below budget",
+        "Sales at or below budget",
         f"{summary.within_budget_percentage:.1f}%",
-        help=f"Share of matching transactions priced at or below {_money(budget)}.",
+        help=f"{within_budget_count:,} of {summary.transaction_count:,} matching transactions were at or below {_money(budget)}.",
     )
     st.caption(
-        f"Results match **{town} · {flat_type} · {period[0]:%b %Y} to {period[1]:%b %Y}**. "
-        f"The selected budget of **{_money(budget)}** is used for the affordability comparison."
+        f"{within_budget_count:,} of {summary.transaction_count:,} matching transactions sold at or below "
+        f"your selected budget of **{_money(budget)}**."
     )
 
     left, right = st.columns(2)
     with left:
-        st.subheader("Monthly median resale-price trend")
+        st.subheader("Monthly median resale price")
+        st.caption("The median transacted price for each month with at least one matching sale.")
         trend = monthly_median_trend(filtered)
         st.line_chart(
             trend,
             x="period",
             y="resale_price",
-            x_label="Month",
+            x_label="Transaction month",
             y_label="Median resale price (S$)",
         )
     with right:
         st.subheader("Resale-price distribution")
+        st.caption("Number of matching transactions in each S$50,000 price band.")
         distribution = resale_price_distribution(filtered)
         st.bar_chart(
             distribution,
@@ -131,12 +211,16 @@ def render() -> None:
             y_label="Transactions",
         )
 
-    st.subheader("Filtered transactions")
-    filtered["within_budget"] = filtered["resale_price"].le(budget)
+    st.subheader("Transaction details")
+    st.caption(
+        f"Showing {len(filtered):,} matching records, newest first. "
+        "Use the table controls to search, sort, or choose visible columns."
+    )
+    filtered["budget_status"] = filtered["resale_price"].le(budget).map(
+        {True: "Within budget", False: "Above budget"}
+    )
     columns = [
         "month",
-        "town",
-        "flat_type",
         "address",
         "storey_range",
         "floor_area_sqm",
@@ -145,31 +229,36 @@ def render() -> None:
     ]
     if "remaining_lease" in filtered.columns:
         columns.append("remaining_lease")
-    columns.extend(["resale_price", "price_per_sqm", "within_budget"])
+    columns.extend(["resale_price", "price_per_sqm", "budget_status"])
     table = filtered[columns].copy()
-    table["month"] = table["month"].dt.strftime("%Y-%m")
+    table["month"] = table["month"].dt.strftime("%b %Y")
     st.dataframe(
         table,
         width="stretch",
+        height=520,
         hide_index=True,
         column_config={
-            "month": "Month",
-            "town": "Town",
-            "flat_type": "Flat type",
+            "month": "Transaction month",
             "address": "Address",
             "storey_range": "Storey",
-            "floor_area_sqm": st.column_config.NumberColumn("Area (m²)", format="%.0f"),
+            "floor_area_sqm": st.column_config.NumberColumn("Floor area (m²)", format="%.0f"),
             "flat_model": "Flat model",
             "lease_commence_date": "Lease commenced",
             "remaining_lease": "Remaining lease",
             "resale_price": st.column_config.NumberColumn("Resale price", format="S$ %,.0f"),
-            "price_per_sqm": st.column_config.NumberColumn("Price / m²", format="S$ %,.0f"),
-            "within_budget": st.column_config.CheckboxColumn("Within budget"),
+            "price_per_sqm": st.column_config.NumberColumn("Price per m²", format="S$ %,.0f"),
+            "budget_status": "Budget comparison",
         },
     )
     st.download_button(
-        "Download filtered CSV",
+        "Download these transactions (CSV)",
         table.to_csv(index=False).encode("utf-8"),
         "resaleready_filtered_transactions.csv",
         "text/csv",
+    )
+
+    st.divider()
+    st.caption(
+        "Reminder: These are historical transaction records, not official valuations, "
+        "asking prices, or forecasts of future resale prices."
     )
