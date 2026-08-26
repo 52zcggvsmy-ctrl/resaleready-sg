@@ -1,0 +1,58 @@
+{
+  "documents": [
+    {
+      "filename": "hdb_01_resale_process_overview.pdf",
+      "document_title": "Overview of Resale Flat Buying Process",
+      "source_organization": "Housing & Development Board (HDB)",
+      "source_url": "https://www.hdb.gov.sg/buying-a-flat/resale-flats/process-for-buying-a-resale-flat/overview",
+      "last_updated": "24 July 2026",
+      "content_start": "Here is an overview of the resale process:",
+      "content_end": "BuyingandSellingaResaleFlat"
+    },
+    {
+      "filename": "hdb_02_hfe_letter.pdf",
+      "document_title": "Application for an HDB Flat Eligibility (HFE) Letter",
+      "source_organization": "Housing & Development Board (HDB)",
+      "source_url": "https://www.hdb.gov.sg/buying-a-flat/flat-grant-and-loan-eligibility/application-for-an-hdb-flat-eligibility-hfe-letter",
+      "last_updated": "18 August 2026",
+      "content_start": "Make an informed decision",
+      "content_end": "Income Guidelines and"
+    },
+    {
+      "filename": "hdb_03_option_to_purchase.pdf",
+      "document_title": "Option to Purchase When Buying a Resale Flat",
+      "source_organization": "Housing & Development Board (HDB)",
+      "source_url": "https://www.hdb.gov.sg/buying-a-flat/resale-flats/process-for-buying-a-resale-flat/option-to-purchase",
+      "last_updated": "29 July 2026",
+      "content_start": "After you have obtained a valid HDB Flat Eligibility",
+      "content_end": "Request for Value for a Resale"
+    },
+    {
+      "filename": "hdb_04_request_for_value.pdf",
+      "document_title": "Request for Value for a Resale Flat",
+      "source_organization": "Housing & Development Board (HDB)",
+      "source_url": "https://www.hdb.gov.sg/buying-a-flat/resale-flats/process-for-buying-a-resale-flat/option-to-purchase/request-for-value",
+      "last_updated": "28 April 2026",
+      "content_start": "After the sellers have granted you an Option to Purchase",
+      "content_end": "Application Process for a Resale"
+    },
+    {
+      "filename": "hdb_05_resale_application.pdf",
+      "document_title": "Application Process for a Resale Flat Purchase",
+      "source_organization": "Housing & Development Board (HDB)",
+      "source_url": "https://www.hdb.gov.sg/buying-a-flat/resale-flats/process-for-buying-a-resale-flat/resale-flat-application/application-process",
+      "last_updated": "18 August 2026",
+      "content_start": "After you have exercised the Option to Purchase",
+      "content_end": "Approval of Resale Flat"
+    },
+    {
+      "filename": "hdb_06_resale_completion.pdf",
+      "document_title": "Resale Flat Completion for Buyers",
+      "source_organization": "Housing & Development Board (HDB)",
+      "source_url": "https://www.hdb.gov.sg/buying-a-flat/resale-flats/process-for-buying-a-resale-flat/resale-flat-completion",
+      "last_updated": "18 August 2026",
+      "content_start": "Find out what you need to prepare before you attend",
+      "content_end": "Conditions After Buying a"
+    }
+  ]
+}

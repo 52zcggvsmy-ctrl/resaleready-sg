@@ -1,3 +1,6 @@
-"""Reserved interface for the later retrieval-augmented generation feature."""
+"""Public interfaces for ResaleReady document retrieval."""
 
-# Future public API: answer_question(question: str) -> Answer
+from .models import RetrievedChunk
+from .retrieval import retrieve
+
+__all__ = ["RetrievedChunk", "retrieve"]
